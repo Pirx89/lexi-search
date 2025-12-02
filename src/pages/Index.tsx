@@ -82,6 +82,13 @@ const Index = () => {
     setHasSearched(true);
   }, [searchQuery, category]);
 
+  // Automatisch suchen wenn Kategorie geändert wird
+  useEffect(() => {
+    if (category !== 'all') {
+      handleSearch();
+    }
+  }, [category, handleSearch]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSearch();

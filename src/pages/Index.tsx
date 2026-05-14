@@ -162,7 +162,7 @@ const Index = () => {
               <ConversationEmptyState
                 icon={<MessagesSquare className="h-10 w-10 text-primary" aria-hidden="true" />}
                 title="Wonach suchen Sie?"
-                description="Sagen Sie z. B. „Ich suche eine Tafel in der Nähe", „Gibt es eine Kita in Garding?" oder „Beratung für Familien"."
+                description={'Sagen Sie z. B. „Ich suche eine Tafel in der Nähe", „Gibt es eine Kita in Garding?" oder „Beratung für Familien".'}
               />
             )}
 

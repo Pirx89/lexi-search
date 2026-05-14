@@ -6,40 +6,46 @@
 
 @layer base {
   :root {
-    --background: 0 0% 98%;
-    --foreground: 220 15% 15%;
+    /* Ruhige, kontrastreiche, farbenblind-freundliche Palette
+       (Blau/Orange statt Rot/Grün – sicher für Deuteranopie/Protanopie) */
+    --background: 210 25% 98%;
+    --foreground: 215 30% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 15%;
+    --card-foreground: 215 30% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 15%;
+    --popover-foreground: 215 30% 12%;
 
-    --primary: 220 70% 50%;
+    /* Tiefes Blau – AAA-Kontrast auf Weiß */
+    --primary: 215 75% 32%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 94%;
-    --secondary-foreground: 220 15% 25%;
+    --secondary: 215 25% 92%;
+    --secondary-foreground: 215 30% 18%;
 
-    --muted: 220 15% 94%;
-    --muted-foreground: 220 10% 45%;
+    --muted: 215 20% 94%;
+    --muted-foreground: 215 20% 32%;
 
-    --accent: 220 15% 94%;
-    --accent-foreground: 220 15% 25%;
+    --accent: 215 25% 92%;
+    --accent-foreground: 215 30% 18%;
 
-    --destructive: 0 84% 60%;
+    /* Warnung/Fehler: kräftiges Orange-Rot, nie allein – immer mit Icon/Text */
+    --destructive: 12 80% 38%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 70% 40%;
+    /* Erfolg: dunkles Teal statt klassischem Grün – besser unterscheidbar */
+    --success: 185 70% 26%;
     --success-foreground: 0 0% 100%;
 
-    --similar: 35 90% 50%;
-    --similar-foreground: 220 15% 15%;
-    --similar-bg: 40 100% 96%;
+    /* "Ähnlich": kräftiges Orange (colorblind-safe gegenüber Blau) */
+    --similar: 28 90% 38%;
+    --similar-foreground: 0 0% 100%;
+    --similar-bg: 35 90% 94%;
 
-    --border: 220 15% 90%;
-    --input: 220 15% 90%;
-    --ring: 220 70% 50%;
+    --border: 215 20% 80%;
+    --input: 215 20% 70%;
+    --ring: 215 85% 40%;
 
     --radius: 0.5rem;
 

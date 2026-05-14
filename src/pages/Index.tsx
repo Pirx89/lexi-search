@@ -124,7 +124,10 @@ const Index = () => {
     }
   }, [status]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (
+    _msg: unknown,
+    e: React.FormEvent<HTMLFormElement>,
+  ) => {
     e.preventDefault();
     const text = input.trim();
     if (!text || status === "submitted" || status === "streaming") return;

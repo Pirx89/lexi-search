@@ -1,124 +1,141 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, MapPin, Phone, Mail, Clock, Lightbulb, Info, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { importData, searchEntries, DataEntry } from '@/lib/database';
-import { sampleData, sampleCategories } from '@/lib/sample-data';
-import { cn } from '@/lib/utils';
+import { useEffect, useRef, useState } from "react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type ToolUIPart } from "ai";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
-function ResultCard({ entry, isSimilar = false }: { entry: DataEntry; isSimilar?: boolean }) {
-  return (
-    <article
-      className={cn('result-card animate-fade-in', isSimilar && 'result-card-similar')}
-      aria-label={isSimilar ? `Ähnliches Angebot: ${entry.name}` : entry.name}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-lg font-semibold text-foreground">{entry.name}</h3>
-            {entry.category && (
-              <span className="category-badge" aria-label={`Kategorie: ${entry.category}`}>
-                {entry.category}
-              </span>
-            )}
-            {isSimilar && (
-              <span className="similar-badge" aria-label="Ähnliches Angebot, kein exakter Treffer">
-                <Lightbulb className="h-3.5 w-3.5" aria-hidden="true" />
-                Ähnlich
-              </span>
-            )}
-          </div>
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
+import {
+  PromptInput,
+  PromptInputTextarea,
+  PromptInputFooter,
+  PromptInputSubmit,
+} from "@/components/ai-elements/prompt-input";
+import { Shimmer } from "@/components/ai-elements/shimmer";
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+} from "@/components/ai-elements/tool";
+import { MapPin, Phone, Mail, Clock, MessagesSquare, Search } from "lucide-react";
 
-          {entry.description && (
-            <p className="mt-2 text-base text-foreground/90">{entry.description}</p>
-          )}
+const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-          <dl className="mt-3 flex flex-col gap-2 text-base text-foreground">
-            {entry.address && (
-              <div className="flex items-start gap-2">
-                <MapPin className="h-5 w-5 mt-0.5 flex-shrink-0 text-primary" aria-hidden="true" />
-                <div>
-                  <dt className="sr-only">Adresse</dt>
-                  <dd>{entry.address}</dd>
-                </div>
-              </div>
-            )}
-            {entry.phone && (
-              <div className="flex items-start gap-2">
-                <Phone className="h-5 w-5 mt-0.5 flex-shrink-0 text-primary" aria-hidden="true" />
-                <div>
-                  <dt className="sr-only">Telefon</dt>
-                  <dd>
-                    <a href={`tel:${entry.phone}`} className="underline underline-offset-2 hover:no-underline">
-                      {entry.phone}
-                    </a>
-                  </dd>
-                </div>
-              </div>
-            )}
-            {entry.email && (
-              <div className="flex items-start gap-2">
-                <Mail className="h-5 w-5 mt-0.5 flex-shrink-0 text-primary" aria-hidden="true" />
-                <div>
-                  <dt className="sr-only">E-Mail</dt>
-                  <dd>
-                    <a href={`mailto:${entry.email}`} className="underline underline-offset-2 hover:no-underline">
-                      {entry.email}
-                    </a>
-                  </dd>
-                </div>
-              </div>
-            )}
-            {entry.openingHours && (
-              <div className="flex items-start gap-2">
-                <Clock className="h-5 w-5 mt-0.5 flex-shrink-0 text-primary" aria-hidden="true" />
-                <div>
-                  <dt className="sr-only">Öffnungszeiten</dt>
-                  <dd>{entry.openingHours}</dd>
-                </div>
-              </div>
-            )}
-          </dl>
-        </div>
+type OfferResult = {
+  id: number;
+  name: string;
+  category?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  openingHours?: string;
+  description?: string;
+};
+
+function OffersResultCard({ data }: { data: { count: number; query: string; category: string | null; results: OfferResult[] } }) {
+  if (!data.results?.length) {
+    return (
+      <div className="rounded-lg border-2 border-dashed border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+        Keine Treffer für „{data.query}"{data.category ? ` in Kategorie ${data.category}` : ""}.
       </div>
-    </article>
+    );
+  }
+  return (
+    <div className="space-y-3 my-3">
+      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <Search className="h-4 w-4 text-primary" aria-hidden="true" />
+        {data.count} {data.count === 1 ? "Angebot" : "Angebote"} gefunden
+        {data.category ? <span className="text-muted-foreground">· Kategorie: {data.category}</span> : null}
+      </div>
+      <ul className="space-y-2">
+        {data.results.map((o) => (
+          <li key={o.id} className="rounded-lg border-2 border-border bg-card p-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="font-semibold text-foreground">{o.name}</h4>
+              {o.category && (
+                <span className="text-xs font-medium px-2 py-0.5 rounded bg-secondary text-secondary-foreground border border-border">
+                  {o.category}
+                </span>
+              )}
+            </div>
+            {o.description && <p className="text-sm text-foreground/90 mt-1">{o.description}</p>}
+            <dl className="mt-2 space-y-1 text-sm text-foreground">
+              {o.address && (
+                <div className="flex items-start gap-2"><MapPin className="h-4 w-4 mt-0.5 text-primary" aria-hidden="true" /><dd>{o.address}</dd></div>
+              )}
+              {o.phone && (
+                <div className="flex items-start gap-2"><Phone className="h-4 w-4 mt-0.5 text-primary" aria-hidden="true" /><dd><a className="underline underline-offset-2" href={`tel:${o.phone}`}>{o.phone}</a></dd></div>
+              )}
+              {o.email && (
+                <div className="flex items-start gap-2"><Mail className="h-4 w-4 mt-0.5 text-primary" aria-hidden="true" /><dd><a className="underline underline-offset-2" href={`mailto:${o.email}`}>{o.email}</a></dd></div>
+              )}
+              {o.openingHours && (
+                <div className="flex items-start gap-2"><Clock className="h-4 w-4 mt-0.5 text-primary" aria-hidden="true" /><dd>{o.openingHours}</dd></div>
+              )}
+            </dl>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
 const Index = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [category, setCategory] = useState('all');
-  const [exactResults, setExactResults] = useState<DataEntry[]>([]);
-  const [similarResults, setSimilarResults] = useState<DataEntry[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [input, setInput] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // Custom transport that includes the Supabase anon key (function has verify_jwt=false but
+  // the edge runtime still expects an apikey header on most setups).
+  const transport = new DefaultChatTransport({
+    api: FUNCTION_URL,
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+    },
+  });
+
+  const { messages, sendMessage, status, error } = useChat({
+    transport,
+    onError(err) {
+      console.error("Chat error:", err);
+      toast({
+        title: "Fehler beim Chat",
+        description: err.message || "Bitte später erneut versuchen.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Focus the textarea on mount, after each send, and after streaming finishes.
   useEffect(() => {
-    importData(sampleData);
-  }, []);
-
-  const handleSearch = useCallback(() => {
-    const { exact, similar } = searchEntries(searchQuery, category);
-    setExactResults(exact);
-    setSimilarResults(similar);
-    setHasSearched(true);
-  }, [searchQuery, category]);
-
-  useEffect(() => {
-    if (category !== 'all') {
-      handleSearch();
+    if (status === "ready" || status === undefined) {
+      textareaRef.current?.focus();
     }
-  }, [category, handleSearch]);
+  }, [status]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || status === "submitted" || status === "streaming") return;
+    setInput("");
+    await sendMessage({ text });
   };
 
+  const isLoading = status === "submitted" || status === "streaming";
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded"
@@ -126,152 +143,100 @@ const Index = () => {
         Zum Hauptinhalt springen
       </a>
 
-      <div className="container mx-auto py-8 md:py-12 px-4">
-        <header className="text-center mb-10">
-          <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
-            Angebote im Sozialraum
-          </h1>
-          <p className="mt-3 text-lg text-muted-foreground">
-            Finden Sie Angebote und Partner in Ihrer Nähe
-          </p>
-        </header>
+      <header className="border-b-2 border-border bg-card">
+        <div className="container mx-auto max-w-3xl px-4 py-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center">
+            <MessagesSquare className="h-5 w-5 text-primary" aria-hidden="true" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-foreground leading-tight">Sozialraum-Assistent</h1>
+            <p className="text-sm text-muted-foreground">Fragen Sie nach Angeboten, Vereinen oder Beratungen</p>
+          </div>
+        </div>
+      </header>
 
-        <main id="main">
-          {/* Suchbereich */}
-          <section aria-labelledby="search-heading" className="max-w-2xl mx-auto mb-10">
-            <h2 id="search-heading" className="sr-only">Suche</h2>
-
-            <form
-              onSubmit={(e) => { e.preventDefault(); handleSearch(); }}
-              className="flex flex-col gap-4"
-              role="search"
-            >
-              <div>
-                <Label htmlFor="search-input" className="text-base font-medium mb-2 block">
-                  Suchbegriff
-                </Label>
-                <div className="relative">
-                  <Search
-                    className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <Input
-                    id="search-input"
-                    type="text"
-                    placeholder="z. B. Beratung, Sport, Treff …"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    className="pl-11 h-12 text-base border-2"
-                    aria-describedby="search-hint"
-                  />
-                </div>
-                <p id="search-hint" className="sr-only">
-                  Geben Sie einen Suchbegriff ein und drücken Sie Enter oder den Suchen-Knopf.
-                </p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1">
-                  <Label htmlFor="category-select" className="text-base font-medium mb-2 block">
-                    Kategorie <span className="text-muted-foreground font-normal">(optional)</span>
-                  </Label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger id="category-select" className="h-12 text-base border-2">
-                      <SelectValue placeholder="Alle Kategorien" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover">
-                      <SelectItem value="all">Alle Kategorien</SelectItem>
-                      {sampleCategories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex sm:items-end">
-                  <Button type="submit" className="h-12 px-8 text-base font-semibold w-full sm:w-auto">
-                    <Search className="h-5 w-5 mr-2" aria-hidden="true" />
-                    Suchen
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </section>
-
-          {/* Ergebnisse */}
-          <section
-            aria-labelledby="results-heading"
-            aria-live="polite"
-            aria-busy={false}
-            className="max-w-2xl mx-auto space-y-6"
-          >
-            <h2 id="results-heading" className="sr-only">Suchergebnisse</h2>
-
-            {exactResults.length > 0 && (
-              <div className="space-y-4">
-                <div
-                  role="status"
-                  className="flex items-center gap-2 text-base font-medium text-foreground bg-secondary border-2 border-border rounded-md px-4 py-3"
-                >
-                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" aria-hidden="true" />
-                  <span>
-                    <strong>{exactResults.length}</strong>{' '}
-                    {exactResults.length === 1 ? 'Ergebnis' : 'Ergebnisse'} gefunden
-                  </span>
-                </div>
-                {exactResults.map((entry) => (
-                  <ResultCard key={entry.id} entry={entry} />
-                ))}
-              </div>
+      <main id="main" className="flex-1 flex flex-col container mx-auto max-w-3xl w-full px-4 py-4 min-h-0">
+        <Conversation className="flex-1 min-h-0 rounded-lg border-2 border-border bg-card">
+          <ConversationContent>
+            {messages.length === 0 && (
+              <ConversationEmptyState
+                icon={<MessagesSquare className="h-10 w-10 text-primary" aria-hidden="true" />}
+                title="Wonach suchen Sie?"
+                description="Sagen Sie z. B. „Ich suche eine Tafel in der Nähe", „Gibt es eine Kita in Garding?" oder „Beratung für Familien"."
+              />
             )}
 
-            {hasSearched && exactResults.length === 0 && similarResults.length > 0 && (
-              <div className="space-y-4">
-                <div
-                  role="status"
-                  className="flex items-start gap-3 bg-similar-bg border-2 border-similar border-dashed rounded-md px-4 py-3"
-                >
-                  <Info className="h-5 w-5 mt-0.5 text-similar flex-shrink-0" aria-hidden="true" />
-                  <div>
-                    <p className="font-semibold text-foreground">Kein exakter Treffer</p>
-                    <p className="text-base text-foreground/90 mt-1">
-                      Vielleicht passt eines dieser ähnlichen Angebote:
-                    </p>
-                  </div>
-                </div>
-                {similarResults.map((entry) => (
-                  <ResultCard key={entry.id} entry={entry} isSimilar />
-                ))}
-              </div>
-            )}
+            {messages.map((message) => (
+              <Message key={message.id} from={message.role}>
+                <MessageContent>
+                  {message.parts.map((part, idx) => {
+                    if (part.type === "text") {
+                      return message.role === "assistant" ? (
+                        <MessageResponse key={idx}>{part.text}</MessageResponse>
+                      ) : (
+                        <span key={idx}>{part.text}</span>
+                      );
+                    }
 
-            {hasSearched && exactResults.length === 0 && similarResults.length === 0 && searchQuery.trim() && (
-              <div
-                role="status"
-                className="flex items-start gap-3 bg-card border-2 border-border rounded-md px-4 py-6"
-              >
-                <AlertCircle className="h-6 w-6 mt-0.5 text-destructive flex-shrink-0" aria-hidden="true" />
-                <div>
-                  <p className="font-semibold text-foreground text-lg">Keine Ergebnisse gefunden</p>
-                  <p className="text-base text-foreground/90 mt-1">
-                    Versuchen Sie einen anderen Suchbegriff oder ändern Sie die Kategorie.
-                  </p>
-                </div>
-              </div>
-            )}
+                    // Tool parts: search_offers
+                    if (part.type === "tool-search_offers" || part.type?.startsWith("tool-")) {
+                      const toolPart = part as ToolUIPart;
+                      const output = toolPart.state === "output-available" ? toolPart.output : null;
+                      return (
+                        <div key={idx} className="w-full">
+                          <Tool defaultOpen={false}>
+                            <ToolHeader
+                              type={toolPart.type as ToolUIPart["type"]}
+                              state={toolPart.state}
+                              title="Angebote suchen"
+                            />
+                            <ToolContent>
+                              {toolPart.input ? <ToolInput input={toolPart.input} /> : null}
+                            </ToolContent>
+                          </Tool>
+                          {output && typeof output === "object" && "results" in (output as object) ? (
+                            <OffersResultCard data={output as never} />
+                          ) : null}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                </MessageContent>
+              </Message>
+            ))}
 
-            {!hasSearched && (
-              <div className="flex items-start gap-3 bg-secondary border-2 border-border rounded-md px-4 py-6">
-                <Info className="h-6 w-6 mt-0.5 text-primary flex-shrink-0" aria-hidden="true" />
-                <p className="text-base text-foreground">
-                  Geben Sie einen Suchbegriff ein oder wählen Sie eine Kategorie, um Angebote zu finden.
-                </p>
-              </div>
+            {status === "submitted" && (
+              <Message from="assistant">
+                <MessageContent>
+                  <Shimmer>Denke nach …</Shimmer>
+                </MessageContent>
+              </Message>
             )}
-          </section>
-        </main>
-      </div>
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
+
+        <div className="mt-3">
+          <PromptInput onSubmit={handleSubmit}>
+            <PromptInputTextarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Schreiben Sie Ihre Frage …"
+              disabled={isLoading}
+            />
+            <PromptInputFooter className="justify-end">
+              <PromptInputSubmit status={status} disabled={!input.trim() || isLoading} />
+            </PromptInputFooter>
+          </PromptInput>
+          {error && (
+            <p role="alert" className="mt-2 text-sm text-destructive">
+              {error.message}
+            </p>
+          )}
+        </div>
+      </main>
     </div>
   );
 };

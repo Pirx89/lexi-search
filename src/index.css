@@ -111,27 +111,44 @@
     @apply border-border;
   }
 
+  html {
+    font-size: 100%;
+    text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.6;
+  }
+
+  :focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
 @layer components {
   .result-card {
-    @apply bg-card rounded-lg border border-border p-4 transition-all duration-200 hover:shadow-md hover:border-primary/30;
+    @apply bg-card rounded-lg border-2 border-border p-5 transition-all duration-200
+           hover:shadow-md hover:border-primary focus-within:border-primary;
   }
 
   .result-card-similar {
-    @apply bg-similar-bg border-similar/30;
+    /* Zusätzlich zur Farbe: gestrichelter Rand + linker Akzentbalken als Form-Marker */
+    @apply bg-similar-bg border-similar border-dashed border-l-[6px] border-l-similar;
   }
 
   .category-badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary;
+    @apply inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold
+           bg-secondary text-secondary-foreground border border-border;
   }
 
   .similar-badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-similar/10 text-similar;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold
+           bg-similar text-similar-foreground;
   }
 }
 

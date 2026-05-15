@@ -119,8 +119,8 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 1.0625rem;
-    line-height: 1.6;
+    font-size: 1.25rem;
+    line-height: 1.7;
   }
 
   :focus-visible {

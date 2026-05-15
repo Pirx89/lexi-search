@@ -28,7 +28,8 @@ import {
   ToolHeader,
   ToolInput,
 } from "@/components/ai-elements/tool";
-import { MapPin, Phone, Mail, Clock, MessagesSquare, Search } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, MessagesSquare, Search, Volume2, Square } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
@@ -93,6 +94,7 @@ function OffersResultCard({ data }: { data: { count: number; query: string; cate
 
 const Index = () => {
   const [input, setInput] = useState("");
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Custom transport that includes the Supabase anon key (function has verify_jwt=false but
@@ -136,6 +138,67 @@ const Index = () => {
   };
 
   const isLoading = status === "submitted" || status === "streaming";
+
+  // Build readable text from the last assistant message (text + offers)
+  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+  const buildSpeechText = (): string => {
+    if (!lastAssistant) return "";
+    const chunks: string[] = [];
+    for (const part of lastAssistant.parts) {
+      if (part.type === "text" && part.text) chunks.push(part.text);
+      if (part.type?.startsWith("tool-")) {
+        const tp = part as ToolUIPart;
+        const out = tp.state === "output-available" ? (tp.output as { results?: OfferResult[]; count?: number; query?: string } | null) : null;
+        if (out?.results?.length) {
+          chunks.push(`${out.count} ${out.count === 1 ? "Angebot" : "Angebote"} gefunden${out.query ? ` für ${out.query}` : ""}.`);
+          out.results.forEach((o, i) => {
+            const parts = [
+              `${i + 1}. ${o.name}`,
+              o.category ? `Kategorie: ${o.category}` : "",
+              o.description || "",
+              o.address ? `Adresse: ${o.address}` : "",
+              o.phone ? `Telefon: ${o.phone}` : "",
+              o.openingHours ? `Öffnungszeiten: ${o.openingHours}` : "",
+            ].filter(Boolean);
+            chunks.push(parts.join(". "));
+          });
+        }
+      }
+    }
+    return chunks.join("\n\n");
+  };
+
+  const handleSpeak = () => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      toast({ title: "Vorlesen nicht unterstützt", description: "Ihr Browser unterstützt keine Sprachausgabe.", variant: "destructive" });
+      return;
+    }
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+    const text = buildSpeechText().trim();
+    if (!text) return;
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "de-DE";
+    utter.rate = 0.95;
+    utter.onend = () => setIsSpeaking(false);
+    utter.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utter);
+    setIsSpeaking(true);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const canSpeak = !!lastAssistant && !isLoading;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -219,6 +282,21 @@ const Index = () => {
           </ConversationContent>
           <ConversationScrollButton />
         </Conversation>
+
+        <div className="mt-3 flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSpeak}
+            disabled={!canSpeak}
+            aria-pressed={isSpeaking}
+            aria-label={isSpeaking ? "Vorlesen stoppen" : "Letzte Antwort vorlesen"}
+          >
+            {isSpeaking ? <Square aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
+            {isSpeaking ? "Stoppen" : "Letzte Antwort vorlesen"}
+          </Button>
+        </div>
 
         <div className="mt-3">
           <PromptInput onSubmit={handleSubmit}>

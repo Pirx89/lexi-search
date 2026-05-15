@@ -283,6 +283,21 @@ const Index = () => {
           <ConversationScrollButton />
         </Conversation>
 
+        <div className="mt-3 flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSpeak}
+            disabled={!canSpeak}
+            aria-pressed={isSpeaking}
+            aria-label={isSpeaking ? "Vorlesen stoppen" : "Letzte Antwort vorlesen"}
+          >
+            {isSpeaking ? <Square aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
+            {isSpeaking ? "Stoppen" : "Letzte Antwort vorlesen"}
+          </Button>
+        </div>
+
         <div className="mt-3">
           <PromptInput onSubmit={handleSubmit}>
             <PromptInputTextarea

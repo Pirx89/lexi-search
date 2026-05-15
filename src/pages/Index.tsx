@@ -94,6 +94,7 @@ function OffersResultCard({ data }: { data: { count: number; query: string; cate
 
 const Index = () => {
   const [input, setInput] = useState("");
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Custom transport that includes the Supabase anon key (function has verify_jwt=false but

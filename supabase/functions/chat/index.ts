@@ -4,7 +4,7 @@
 import { convertToModelMessages, streamText, stepCountIs, tool, type UIMessage } from "npm:ai";
 import { z } from "npm:zod";
 import { createLovableAiGatewayProvider } from "../_shared/ai-gateway.ts";
-import { searchOffers, categories } from "../_shared/offers-data.ts";
+import { searchOffers, categories, searchExtendedOffers, extendedCategories } from "../_shared/offers-data.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

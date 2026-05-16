@@ -160,24 +160,6 @@ const Index = () => {
     const chunks: string[] = [];
     for (const part of lastAssistant.parts) {
       if (part.type === "text" && part.text) chunks.push(part.text);
-      if (part.type?.startsWith("tool-")) {
-        const tp = part as ToolUIPart;
-        const out = tp.state === "output-available" ? (tp.output as { results?: OfferResult[]; count?: number; query?: string } | null) : null;
-        if (out?.results?.length) {
-          chunks.push(`${out.count} ${out.count === 1 ? "Angebot" : "Angebote"} gefunden${out.query ? ` für ${out.query}` : ""}.`);
-          out.results.forEach((o, i) => {
-            const parts = [
-              `${i + 1}. ${o.name}`,
-              o.category ? `Kategorie: ${o.category}` : "",
-              o.description || "",
-              o.address ? `Adresse: ${o.address}` : "",
-              o.phone ? `Telefon: ${o.phone}` : "",
-              o.openingHours ? `Öffnungszeiten: ${o.openingHours}` : "",
-            ].filter(Boolean);
-            chunks.push(parts.join(". "));
-          });
-        }
-      }
     }
     return chunks.join("\n\n");
   };

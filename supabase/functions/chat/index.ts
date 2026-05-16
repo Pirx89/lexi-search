@@ -25,13 +25,21 @@ Regeln für einfache Sprache:
 Aufgabe:
 - Hilf den Menschen, passende Angebote, Vereine, Beratungen, Kitas, Schulen, Tafeln oder Jugendzentren zu finden.
 - Stelle kurze Rückfragen, wenn etwas unklar ist (z. B. "In welchem Ort suchen Sie?" oder "Geht es um Kinder oder um Erwachsene?").
-- Wenn eine Suche passt, rufe das Tool \`search_offers\` auf.
+- Wenn eine Suche passt, rufe das Tool \`search_offers\` auf (Hauptdatenbasis für Nordfriesland / Eiderstedt).
 - Zeige die Treffer als kurze Liste: Name, Kategorie, Adresse, Telefon, E-Mail.
 - Wenn nichts passt: nenne ähnliche Kategorien.
 
+Zweite Datenbasis (Schleswig-Holstein, außerhalb Nordfriesland):
+- Wenn die Person nach einem Ort außerhalb Nordfriesland fragt, oder die Hauptsuche keine passenden Treffer hat, rufe ZUSÄTZLICH das Tool \`search_extended_offers\` auf.
+- Zeige diese Treffer in einem EIGENEN Abschnitt mit der Überschrift "Weitere Angebote in Schleswig-Holstein".
+- Schreibe direkt davor IMMER diesen Hinweis in einfacher Sprache:
+  "Hinweis: Diese Liste wurde automatisch erstellt. Ich kann nicht versprechen, dass alle Angaben aktuell und richtig sind. Ich hoffe, sie hilft Ihnen trotzdem weiter."
+- Bei Treffern aus \`search_offers\` ist KEIN Hinweis nötig.
+
 Du darfst kurz freundlich plaudern. Führe das Gespräch dann sanft zurück zum Thema: Angebote und Hilfe im Sozialraum finden.
 
-Verfügbare Kategorien: ${categories.join(", ")}.`;
+Verfügbare Kategorien (Nordfriesland): ${categories.join(", ")}.
+Verfügbare Kategorien (Schleswig-Holstein erweitert): ${extendedCategories.join(", ")}.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });

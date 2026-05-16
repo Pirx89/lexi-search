@@ -259,23 +259,24 @@ const Index = () => {
                     }
 
                     // Tool parts: search_offers
-                    if (part.type === "tool-search_offers" || part.type?.startsWith("tool-")) {
+                    if (part.type === "tool-search_offers" || part.type === "tool-search_extended_offers" || part.type?.startsWith("tool-")) {
                       const toolPart = part as ToolUIPart;
                       const output = toolPart.state === "output-available" ? toolPart.output : null;
+                      const isExtended = part.type === "tool-search_extended_offers";
                       return (
                         <div key={idx} className="w-full">
                           <Tool defaultOpen={false}>
                             <ToolHeader
                               type={toolPart.type as ToolUIPart["type"]}
                               state={toolPart.state}
-                              title="Angebote suchen"
+                              title={isExtended ? "Weitere Angebote in SH suchen" : "Angebote suchen"}
                             />
                             <ToolContent>
                               {toolPart.input ? <ToolInput input={toolPart.input} /> : null}
                             </ToolContent>
                           </Tool>
                           {output && typeof output === "object" && "results" in (output as object) ? (
-                            <OffersResultCard data={output as never} />
+                            <OffersResultCard data={output as never} extended={isExtended} />
                           ) : null}
                         </div>
                       );

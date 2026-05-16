@@ -4,7 +4,7 @@
 import { convertToModelMessages, streamText, stepCountIs, tool, type UIMessage } from "npm:ai";
 import { z } from "npm:zod";
 import { createLovableAiGatewayProvider } from "../_shared/ai-gateway.ts";
-import { searchOffers, categories } from "../_shared/offers-data.ts";
+import { searchOffers, categories, searchExtendedOffers, extendedCategories } from "../_shared/offers-data.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,13 +25,21 @@ Regeln für einfache Sprache:
 Aufgabe:
 - Hilf den Menschen, passende Angebote, Vereine, Beratungen, Kitas, Schulen, Tafeln oder Jugendzentren zu finden.
 - Stelle kurze Rückfragen, wenn etwas unklar ist (z. B. "In welchem Ort suchen Sie?" oder "Geht es um Kinder oder um Erwachsene?").
-- Wenn eine Suche passt, rufe das Tool \`search_offers\` auf.
+- Wenn eine Suche passt, rufe das Tool \`search_offers\` auf (Hauptdatenbasis für Nordfriesland / Eiderstedt).
 - Zeige die Treffer als kurze Liste: Name, Kategorie, Adresse, Telefon, E-Mail.
 - Wenn nichts passt: nenne ähnliche Kategorien.
 
+Zweite Datenbasis (Schleswig-Holstein, außerhalb Nordfriesland):
+- Wenn die Person nach einem Ort außerhalb Nordfriesland fragt, oder die Hauptsuche keine passenden Treffer hat, rufe ZUSÄTZLICH das Tool \`search_extended_offers\` auf.
+- Zeige diese Treffer in einem EIGENEN Abschnitt mit der Überschrift "Weitere Angebote in Schleswig-Holstein".
+- Schreibe direkt davor IMMER diesen Hinweis in einfacher Sprache:
+  "Hinweis: Diese Liste wurde automatisch erstellt. Ich kann nicht versprechen, dass alle Angaben aktuell und richtig sind. Ich hoffe, sie hilft Ihnen trotzdem weiter."
+- Bei Treffern aus \`search_offers\` ist KEIN Hinweis nötig.
+
 Du darfst kurz freundlich plaudern. Führe das Gespräch dann sanft zurück zum Thema: Angebote und Hilfe im Sozialraum finden.
 
-Verfügbare Kategorien: ${categories.join(", ")}.`;
+Verfügbare Kategorien (Nordfriesland): ${categories.join(", ")}.
+Verfügbare Kategorien (Schleswig-Holstein erweitert): ${extendedCategories.join(", ")}.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -67,6 +75,23 @@ Deno.serve(async (req) => {
               count: results.length,
               query,
               category: category ?? null,
+              results,
+            };
+          },
+        }),
+        search_extended_offers: tool({
+          description: "Sucht in der erweiterten Datenbasis für ganz Schleswig-Holstein (außerhalb Nordfriesland). Nutze dieses Tool zusätzlich, wenn die Person nach einem Ort außerhalb Nordfriesland fragt oder die Hauptsuche keine guten Treffer liefert. Ergebnisse müssen mit dem Aktualitäts-Hinweis ausgegeben werden.",
+          inputSchema: z.object({
+            query: z.string().describe("Suchbegriff, z. B. 'Frauenhaus Kiel', 'Beratung Flensburg'."),
+            category: z.string().optional().describe(`Optionale Kategorie. Beispiele: ${extendedCategories.slice(0, 8).join(", ")}.`),
+          }),
+          execute: async ({ query, category }) => {
+            const results = searchExtendedOffers(query, category, 10);
+            return {
+              count: results.length,
+              query,
+              category: category ?? null,
+              source: "extended",
               results,
             };
           },

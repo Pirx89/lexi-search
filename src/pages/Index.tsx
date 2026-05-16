@@ -28,8 +28,9 @@ import {
   ToolHeader,
   ToolInput,
 } from "@/components/ai-elements/tool";
-import { MapPin, Phone, Mail, Clock, MessagesSquare, Search, Volume2, Square } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, MessagesSquare, Search, Volume2, Square, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { jsPDF } from "jspdf";
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 

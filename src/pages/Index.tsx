@@ -352,7 +352,18 @@ const Index = () => {
           <ConversationScrollButton />
         </Conversation>
 
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex justify-end gap-2 flex-wrap">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadPdf}
+            disabled={!canDownload}
+            aria-label="Ergebnisse als PDF herunterladen"
+          >
+            <Download aria-hidden="true" />
+            Als PDF herunterladen
+          </Button>
           <Button
             type="button"
             variant="outline"

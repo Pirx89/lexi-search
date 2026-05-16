@@ -197,6 +197,77 @@ const Index = () => {
 
   const canSpeak = !!lastAssistant && !isLoading;
 
+  const handleDownloadPdf = () => {
+    if (!lastAssistant) return;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const marginX = 48;
+    const marginY = 56;
+    const maxWidth = pageWidth - marginX * 2;
+    let y = marginY;
+
+    const ensureSpace = (lineHeight: number) => {
+      if (y + lineHeight > pageHeight - marginY) {
+        doc.addPage();
+        y = marginY;
+      }
+    };
+
+    const writeLines = (text: string, opts: { size?: number; bold?: boolean; gap?: number } = {}) => {
+      const size = opts.size ?? 11;
+      doc.setFontSize(size);
+      doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+      const lines = doc.splitTextToSize(text, maxWidth) as string[];
+      const lh = size * 1.35;
+      for (const line of lines) {
+        ensureSpace(lh);
+        doc.text(line, marginX, y);
+        y += lh;
+      }
+      y += opts.gap ?? 4;
+    };
+
+    writeLines("Sozialraum-Assistent – Ergebnisse", { size: 16, bold: true, gap: 6 });
+    writeLines(new Date().toLocaleString("de-DE"), { size: 9, gap: 12 });
+
+    for (const part of lastAssistant.parts) {
+      if (part.type === "text" && part.text) {
+        writeLines(part.text, { size: 11, gap: 10 });
+      }
+      if (part.type?.startsWith("tool-")) {
+        const tp = part as ToolUIPart;
+        const out = tp.state === "output-available" ? (tp.output as { results?: OfferResult[]; count?: number; query?: string } | null) : null;
+        const isExtended = part.type === "tool-search_extended_offers";
+        if (out?.results?.length) {
+          if (isExtended) {
+            writeLines("Weitere Angebote in Schleswig-Holstein", { size: 13, bold: true, gap: 4 });
+            writeLines(
+              "Hinweis: Diese Liste wurde automatisch erstellt. Ich kann nicht versprechen, dass alle Angaben aktuell und richtig sind. Ich hoffe, sie hilft Ihnen trotzdem weiter.",
+              { size: 9, gap: 8 },
+            );
+          }
+          writeLines(`${out.count} ${out.count === 1 ? "Angebot" : "Angebote"} gefunden${out.query ? ` für „${out.query}"` : ""}`, { size: 11, bold: true, gap: 6 });
+          out.results.forEach((o, i) => {
+            writeLines(`${i + 1}. ${o.name}`, { size: 12, bold: true, gap: 2 });
+            if (o.category) writeLines(`Kategorie: ${o.category}`, { size: 10, gap: 2 });
+            if (o.description) writeLines(o.description, { size: 10, gap: 2 });
+            if (o.address) writeLines(`Adresse: ${o.address}`, { size: 10, gap: 2 });
+            if (o.phone) writeLines(`Telefon: ${o.phone}`, { size: 10, gap: 2 });
+            if (o.email) writeLines(`E-Mail: ${o.email}`, { size: 10, gap: 2 });
+            if (o.openingHours) writeLines(`Öffnungszeiten: ${o.openingHours}`, { size: 10, gap: 2 });
+            y += 6;
+          });
+        }
+      }
+    }
+
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+    doc.save(`sozialraum-ergebnisse-${stamp}.pdf`);
+  };
+
+  const canDownload = !!lastAssistant && !isLoading;
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <a

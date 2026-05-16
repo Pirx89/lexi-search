@@ -37,14 +37,16 @@ type OfferResult = {
   id: number;
   name: string;
   category?: string;
+  city?: string;
   address?: string;
   phone?: string;
   email?: string;
   openingHours?: string;
   description?: string;
+  source?: string;
 };
 
-function OffersResultCard({ data }: { data: { count: number; query: string; category: string | null; results: OfferResult[] } }) {
+function OffersResultCard({ data, extended = false }: { data: { count: number; query: string; category: string | null; results: OfferResult[] }; extended?: boolean }) {
   if (!data.results?.length) {
     return (
       <div className="rounded-lg border-2 border-dashed border-border bg-muted/40 p-4 text-sm text-muted-foreground">
@@ -54,6 +56,15 @@ function OffersResultCard({ data }: { data: { count: number; query: string; cate
   }
   return (
     <div className="space-y-3 my-3">
+      {extended && (
+        <div className="rounded-lg border-2 border-amber-400/60 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-foreground">
+          <p className="font-semibold mb-1">Weitere Angebote in Schleswig-Holstein</p>
+          <p>
+            Hinweis: Diese Liste wurde automatisch erstellt. Ich kann nicht versprechen,
+            dass alle Angaben aktuell und richtig sind. Ich hoffe, sie hilft Ihnen trotzdem weiter.
+          </p>
+        </div>
+      )}
       <div className="flex items-center gap-2 text-sm font-medium text-foreground">
         <Search className="h-4 w-4 text-primary" aria-hidden="true" />
         {data.count} {data.count === 1 ? "Angebot" : "Angebote"} gefunden
@@ -68,6 +79,9 @@ function OffersResultCard({ data }: { data: { count: number; query: string; cate
                 <span className="text-xs font-medium px-2 py-0.5 rounded bg-secondary text-secondary-foreground border border-border">
                   {o.category}
                 </span>
+              )}
+              {o.city && (
+                <span className="text-xs text-muted-foreground">· {o.city}</span>
               )}
             </div>
             {o.description && <p className="text-sm text-foreground/90 mt-1">{o.description}</p>}

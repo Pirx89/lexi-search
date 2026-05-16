@@ -79,6 +79,23 @@ Deno.serve(async (req) => {
             };
           },
         }),
+        search_extended_offers: tool({
+          description: "Sucht in der erweiterten Datenbasis für ganz Schleswig-Holstein (außerhalb Nordfriesland). Nutze dieses Tool zusätzlich, wenn die Person nach einem Ort außerhalb Nordfriesland fragt oder die Hauptsuche keine guten Treffer liefert. Ergebnisse müssen mit dem Aktualitäts-Hinweis ausgegeben werden.",
+          inputSchema: z.object({
+            query: z.string().describe("Suchbegriff, z. B. 'Frauenhaus Kiel', 'Beratung Flensburg'."),
+            category: z.string().optional().describe(`Optionale Kategorie. Beispiele: ${extendedCategories.slice(0, 8).join(", ")}.`),
+          }),
+          execute: async ({ query, category }) => {
+            const results = searchExtendedOffers(query, category, 10);
+            return {
+              count: results.length,
+              query,
+              category: category ?? null,
+              source: "extended",
+              results,
+            };
+          },
+        }),
       },
     });
 

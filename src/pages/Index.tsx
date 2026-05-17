@@ -175,7 +175,14 @@ const Index = () => {
       setIsSpeaking(false);
       return;
     }
-    const text = buildSpeechText().trim();
+    const rawText = buildSpeechText().trim();
+    if (!rawText) return;
+    // Markdown-Symbole (*, #) nicht mitlesen
+    const text = rawText
+      .replace(/[*#]+/g, " ")
+      .replace(/[ \t]+/g, " ")
+      .replace(/ ?\n ?/g, "\n")
+      .trim();
     if (!text) return;
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = "de-DE";

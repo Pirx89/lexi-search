@@ -28,9 +28,18 @@ import {
   ToolHeader,
   ToolInput,
 } from "@/components/ai-elements/tool";
-import { MapPin, Phone, Mail, Clock, MessagesSquare, Search, Volume2, Square, Download } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, MessagesSquare, Search, Volume2, Square, Download, Languages } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { jsPDF } from "jspdf";
+
+type SpeechLang = "de" | "en" | "ru" | "tr";
+const LANG_OPTIONS: { value: SpeechLang; label: string; bcp47: string }[] = [
+  { value: "de", label: "Deutsch", bcp47: "de-DE" },
+  { value: "en", label: "English", bcp47: "en-US" },
+  { value: "ru", label: "Русский", bcp47: "ru-RU" },
+  { value: "tr", label: "Türkçe", bcp47: "tr-TR" },
+];
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
@@ -110,6 +119,8 @@ function OffersResultCard({ data, extended = false }: { data: { count: number; q
 const Index = () => {
   const [input, setInput] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPreparingSpeech, setIsPreparingSpeech] = useState(false);
+  const [speechLang, setSpeechLang] = useState<SpeechLang>("de");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Custom transport that includes the Supabase anon key (function has verify_jwt=false but
@@ -165,7 +176,7 @@ const Index = () => {
     return chunks.join("\n\n");
   };
 
-  const handleSpeak = () => {
+  const handleSpeak = async () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       toast({ title: "Vorlesen nicht unterstützt", description: "Ihr Browser unterstützt keine Sprachausgabe.", variant: "destructive" });
       return;
@@ -178,15 +189,52 @@ const Index = () => {
     const rawText = buildSpeechText().trim();
     if (!rawText) return;
     // Markdown-Symbole (*, #) nicht mitlesen
-    const text = rawText
+    let text = rawText
       .replace(/[*#]+/g, " ")
       .replace(/[ \t]+/g, " ")
       .replace(/ ?\n ?/g, "\n")
       .trim();
     if (!text) return;
+
+    const langOpt = LANG_OPTIONS.find((l) => l.value === speechLang) ?? LANG_OPTIONS[0];
+
+    // Übersetzen, falls Zielsprache nicht Deutsch ist
+    if (speechLang !== "de") {
+      try {
+        setIsPreparingSpeech(true);
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/translate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text, targetLang: speechLang }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Übersetzung fehlgeschlagen");
+        if (data?.text) text = String(data.text).trim();
+      } catch (err) {
+        console.error("translate failed", err);
+        toast({
+          title: "Übersetzung fehlgeschlagen",
+          description: err instanceof Error ? err.message : "Bitte später erneut versuchen.",
+          variant: "destructive",
+        });
+        setIsPreparingSpeech(false);
+        return;
+      } finally {
+        setIsPreparingSpeech(false);
+      }
+    }
+
     const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "de-DE";
+    utter.lang = langOpt.bcp47;
     utter.rate = 0.95;
+    // Passende Stimme wählen, falls verfügbar
+    const voices = window.speechSynthesis.getVoices();
+    const match = voices.find((v) => v.lang?.toLowerCase().startsWith(speechLang));
+    if (match) utter.voice = match;
     utter.onend = () => setIsSpeaking(false);
     utter.onerror = () => setIsSpeaking(false);
     window.speechSynthesis.cancel();
@@ -202,7 +250,7 @@ const Index = () => {
     };
   }, []);
 
-  const canSpeak = !!lastAssistant && !isLoading;
+  const canSpeak = !!lastAssistant && !isLoading && !isPreparingSpeech;
 
   const handleDownloadPdf = () => {
     if (!lastAssistant) return;
@@ -377,6 +425,22 @@ const Index = () => {
             <Download aria-hidden="true" />
             Als PDF herunterladen
           </Button>
+          <Select value={speechLang} onValueChange={(v) => setSpeechLang(v as SpeechLang)}>
+            <SelectTrigger
+              className="h-auto py-3 px-4 text-base gap-2 w-auto"
+              aria-label="Sprache für Sprachausgabe wählen"
+            >
+              <Languages className="size-5" aria-hidden="true" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LANG_OPTIONS.map((l) => (
+                <SelectItem key={l.value} value={l.value} className="text-base">
+                  {l.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             variant="outline"
@@ -388,7 +452,7 @@ const Index = () => {
             className="text-base px-6 py-6 [&_svg]:size-5"
           >
             {isSpeaking ? <Square aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
-            {isSpeaking ? "Stoppen" : "Letzte Antwort vorlesen"}
+            {isPreparingSpeech ? "Übersetze …" : isSpeaking ? "Stoppen" : "Vorlesen"}
           </Button>
         </div>
 

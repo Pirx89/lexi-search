@@ -28,9 +28,18 @@ import {
   ToolHeader,
   ToolInput,
 } from "@/components/ai-elements/tool";
-import { MapPin, Phone, Mail, Clock, MessagesSquare, Search, Volume2, Square, Download } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, MessagesSquare, Search, Volume2, Square, Download, Languages } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { jsPDF } from "jspdf";
+
+type SpeechLang = "de" | "en" | "ru" | "tr";
+const LANG_OPTIONS: { value: SpeechLang; label: string; bcp47: string }[] = [
+  { value: "de", label: "Deutsch", bcp47: "de-DE" },
+  { value: "en", label: "English", bcp47: "en-US" },
+  { value: "ru", label: "Русский", bcp47: "ru-RU" },
+  { value: "tr", label: "Türkçe", bcp47: "tr-TR" },
+];
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 

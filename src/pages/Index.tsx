@@ -310,7 +310,12 @@ const Index = () => {
             {messages.map((message) => (
               <Message key={message.id} from={message.role}>
                 <MessageContent>
-                  {message.parts.map((part, idx) => {
+                  {[...message.parts]
+                    .sort((a, b) => {
+                      const rank = (p: typeof a) => (p.type === "text" ? 0 : p.type?.startsWith("tool-") ? 1 : 2);
+                      return rank(a) - rank(b);
+                    })
+                    .map((part, idx) => {
                     if (part.type === "text") {
                       return message.role === "assistant" ? (
                         <MessageResponse key={idx}>{part.text}</MessageResponse>

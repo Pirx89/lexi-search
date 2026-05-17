@@ -425,6 +425,22 @@ const Index = () => {
             <Download aria-hidden="true" />
             Als PDF herunterladen
           </Button>
+          <Select value={speechLang} onValueChange={(v) => setSpeechLang(v as SpeechLang)}>
+            <SelectTrigger
+              className="h-auto py-3 px-4 text-base gap-2 w-auto"
+              aria-label="Sprache für Sprachausgabe wählen"
+            >
+              <Languages className="size-5" aria-hidden="true" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LANG_OPTIONS.map((l) => (
+                <SelectItem key={l.value} value={l.value} className="text-base">
+                  {l.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             variant="outline"
@@ -436,7 +452,7 @@ const Index = () => {
             className="text-base px-6 py-6 [&_svg]:size-5"
           >
             {isSpeaking ? <Square aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
-            {isSpeaking ? "Stoppen" : "Letzte Antwort vorlesen"}
+            {isPreparingSpeech ? "Übersetze …" : isSpeaking ? "Stoppen" : "Vorlesen"}
           </Button>
         </div>
 

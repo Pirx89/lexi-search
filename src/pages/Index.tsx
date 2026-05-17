@@ -364,14 +364,15 @@ const Index = () => {
           <ConversationScrollButton />
         </Conversation>
 
-        <div className="mt-3 flex justify-end gap-2 flex-wrap">
+        <div className="mt-3 flex justify-end gap-3 flex-wrap">
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="lg"
             onClick={handleDownloadPdf}
             disabled={!canDownload}
             aria-label="Ergebnisse als PDF herunterladen"
+            className="text-base px-6 py-6 [&_svg]:size-5"
           >
             <Download aria-hidden="true" />
             Als PDF herunterladen
@@ -379,11 +380,12 @@ const Index = () => {
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="lg"
             onClick={handleSpeak}
             disabled={!canSpeak}
             aria-pressed={isSpeaking}
             aria-label={isSpeaking ? "Vorlesen stoppen" : "Letzte Antwort vorlesen"}
+            className="text-base px-6 py-6 [&_svg]:size-5"
           >
             {isSpeaking ? <Square aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
             {isSpeaking ? "Stoppen" : "Letzte Antwort vorlesen"}

@@ -176,7 +176,7 @@ const Index = () => {
     return chunks.join("\n\n");
   };
 
-  const handleSpeak = () => {
+  const handleSpeak = async () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       toast({ title: "Vorlesen nicht unterstützt", description: "Ihr Browser unterstützt keine Sprachausgabe.", variant: "destructive" });
       return;
@@ -189,15 +189,52 @@ const Index = () => {
     const rawText = buildSpeechText().trim();
     if (!rawText) return;
     // Markdown-Symbole (*, #) nicht mitlesen
-    const text = rawText
+    let text = rawText
       .replace(/[*#]+/g, " ")
       .replace(/[ \t]+/g, " ")
       .replace(/ ?\n ?/g, "\n")
       .trim();
     if (!text) return;
+
+    const langOpt = LANG_OPTIONS.find((l) => l.value === speechLang) ?? LANG_OPTIONS[0];
+
+    // Übersetzen, falls Zielsprache nicht Deutsch ist
+    if (speechLang !== "de") {
+      try {
+        setIsPreparingSpeech(true);
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/translate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text, targetLang: speechLang }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Übersetzung fehlgeschlagen");
+        if (data?.text) text = String(data.text).trim();
+      } catch (err) {
+        console.error("translate failed", err);
+        toast({
+          title: "Übersetzung fehlgeschlagen",
+          description: err instanceof Error ? err.message : "Bitte später erneut versuchen.",
+          variant: "destructive",
+        });
+        setIsPreparingSpeech(false);
+        return;
+      } finally {
+        setIsPreparingSpeech(false);
+      }
+    }
+
     const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "de-DE";
+    utter.lang = langOpt.bcp47;
     utter.rate = 0.95;
+    // Passende Stimme wählen, falls verfügbar
+    const voices = window.speechSynthesis.getVoices();
+    const match = voices.find((v) => v.lang?.toLowerCase().startsWith(speechLang));
+    if (match) utter.voice = match;
     utter.onend = () => setIsSpeaking(false);
     utter.onerror = () => setIsSpeaking(false);
     window.speechSynthesis.cancel();
@@ -213,7 +250,7 @@ const Index = () => {
     };
   }, []);
 
-  const canSpeak = !!lastAssistant && !isLoading;
+  const canSpeak = !!lastAssistant && !isLoading && !isPreparingSpeech;
 
   const handleDownloadPdf = () => {
     if (!lastAssistant) return;

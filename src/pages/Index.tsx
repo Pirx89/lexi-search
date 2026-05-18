@@ -322,9 +322,11 @@ const Index = () => {
     writeLines("Sozialraum-Assistent – Ergebnisse", { size: 16, bold: true, gap: 6 });
     writeLines(new Date().toLocaleString("de-DE"), { size: 9, gap: 12 });
 
-    for (const part of lastAssistant.parts) {
+    lastAssistant.parts.forEach((part, idx) => {
       if (part.type === "text" && part.text) {
-        writeLines(part.text, { size: 11, gap: 10 });
+        const key = `${lastAssistant.id}::${idx}::${speechLang}`;
+        const text = speechLang !== "de" ? translations[key] ?? part.text : part.text;
+        writeLines(text, { size: 11, gap: 10 });
       }
       if (part.type?.startsWith("tool-")) {
         const tp = part as ToolUIPart;

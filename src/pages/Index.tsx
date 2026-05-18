@@ -353,7 +353,7 @@ const Index = () => {
           });
         }
       }
-    }
+    });
 
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
     doc.save(`sozialraum-ergebnisse-${stamp}.pdf`);

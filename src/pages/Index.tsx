@@ -401,8 +401,15 @@ const Index = () => {
                     })
                     .map((part, idx) => {
                     if (part.type === "text") {
-                      return message.role === "assistant" ? (
-                        <MessageResponse key={idx}>{part.text}</MessageResponse>
+                      const origIdx = message.parts.indexOf(part);
+                      const key = `${message.id}::${origIdx}::${speechLang}`;
+                      const isAssistant = message.role === "assistant";
+                      const displayText =
+                        isAssistant && speechLang !== "de"
+                          ? translations[key] ?? part.text
+                          : part.text;
+                      return isAssistant ? (
+                        <MessageResponse key={idx}>{displayText}</MessageResponse>
                       ) : (
                         <span key={idx}>{part.text}</span>
                       );

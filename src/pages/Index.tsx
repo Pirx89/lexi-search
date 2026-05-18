@@ -121,7 +121,25 @@ const Index = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPreparingSpeech, setIsPreparingSpeech] = useState(false);
   const [speechLang, setSpeechLang] = useState<SpeechLang>("de");
+  // Cache für übersetzte Textteile: key = `${messageId}::${partIdx}::${lang}`
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const translatingRef = useRef<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const translateText = async (text: string, targetLang: SpeechLang): Promise<string> => {
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/translate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({ text, targetLang }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || "Übersetzung fehlgeschlagen");
+    return String(data?.text ?? "").trim();
+  };
 
   // Custom transport that includes the Supabase anon key (function has verify_jwt=false but
   // the edge runtime still expects an apikey header on most setups).
@@ -144,6 +162,28 @@ const Index = () => {
       });
     },
   });
+
+  // Übersetze alle Assistenten-Textteile, wenn Sprache gewechselt wird oder neue Nachricht kommt.
+  useEffect(() => {
+    if (speechLang === "de") return;
+    if (status === "streaming" || status === "submitted") return;
+    for (const m of messages) {
+      if (m.role !== "assistant") continue;
+      m.parts.forEach((part, idx) => {
+        if (part.type !== "text" || !part.text) return;
+        const key = `${m.id}::${idx}::${speechLang}`;
+        if (translations[key] !== undefined) return;
+        if (translatingRef.current.has(key)) return;
+        translatingRef.current.add(key);
+        translateText(part.text, speechLang)
+          .then((t) => setTranslations((prev) => ({ ...prev, [key]: t })))
+          .catch((err) => {
+            console.error("translate failed", err);
+            translatingRef.current.delete(key);
+          });
+      });
+    }
+  }, [messages, speechLang, status, translations]);
 
   // Focus the textarea on mount, after each send, and after streaming finishes.
   useEffect(() => {

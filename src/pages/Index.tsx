@@ -207,12 +207,16 @@ const Index = () => {
 
   // Build readable text from the last assistant message (text + offers)
   const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
-  const buildSpeechText = (): string => {
+  const buildSpeechText = (lang: SpeechLang): string => {
     if (!lastAssistant) return "";
     const chunks: string[] = [];
-    for (const part of lastAssistant.parts) {
-      if (part.type === "text" && part.text) chunks.push(part.text);
-    }
+    lastAssistant.parts.forEach((part, idx) => {
+      if (part.type === "text" && part.text) {
+        const key = `${lastAssistant.id}::${idx}::${lang}`;
+        const translated = lang !== "de" ? translations[key] : undefined;
+        chunks.push(translated ?? part.text);
+      }
+    });
     return chunks.join("\n\n");
   };
 

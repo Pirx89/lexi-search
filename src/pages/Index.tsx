@@ -230,7 +230,7 @@ const Index = () => {
       setIsSpeaking(false);
       return;
     }
-    const rawText = buildSpeechText().trim();
+    const rawText = buildSpeechText(speechLang).trim();
     if (!rawText) return;
     // Markdown-Symbole (*, #) nicht mitlesen
     let text = rawText
@@ -242,22 +242,14 @@ const Index = () => {
 
     const langOpt = LANG_OPTIONS.find((l) => l.value === speechLang) ?? LANG_OPTIONS[0];
 
-    // Übersetzen, falls Zielsprache nicht Deutsch ist
-    if (speechLang !== "de") {
+    // Falls Übersetzung noch nicht im Cache vorliegt (z. B. fehlgeschlagen), on-demand übersetzen
+    const needsTranslate = speechLang !== "de" && lastAssistant?.parts.some(
+      (p, idx) => p.type === "text" && p.text && translations[`${lastAssistant.id}::${idx}::${speechLang}`] === undefined,
+    );
+    if (needsTranslate) {
       try {
         setIsPreparingSpeech(true);
-        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/translate`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ text, targetLang: speechLang }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Übersetzung fehlgeschlagen");
-        if (data?.text) text = String(data.text).trim();
+        text = await translateText(text, speechLang);
       } catch (err) {
         console.error("translate failed", err);
         toast({

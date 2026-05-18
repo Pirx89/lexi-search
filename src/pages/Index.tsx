@@ -121,7 +121,25 @@ const Index = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPreparingSpeech, setIsPreparingSpeech] = useState(false);
   const [speechLang, setSpeechLang] = useState<SpeechLang>("de");
+  // Cache für übersetzte Textteile: key = `${messageId}::${partIdx}::${lang}`
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const translatingRef = useRef<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const translateText = async (text: string, targetLang: SpeechLang): Promise<string> => {
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/translate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({ text, targetLang }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || "Übersetzung fehlgeschlagen");
+    return String(data?.text ?? "").trim();
+  };
 
   // Custom transport that includes the Supabase anon key (function has verify_jwt=false but
   // the edge runtime still expects an apikey header on most setups).
@@ -145,6 +163,28 @@ const Index = () => {
     },
   });
 
+  // Übersetze alle Assistenten-Textteile, wenn Sprache gewechselt wird oder neue Nachricht kommt.
+  useEffect(() => {
+    if (speechLang === "de") return;
+    if (status === "streaming" || status === "submitted") return;
+    for (const m of messages) {
+      if (m.role !== "assistant") continue;
+      m.parts.forEach((part, idx) => {
+        if (part.type !== "text" || !part.text) return;
+        const key = `${m.id}::${idx}::${speechLang}`;
+        if (translations[key] !== undefined) return;
+        if (translatingRef.current.has(key)) return;
+        translatingRef.current.add(key);
+        translateText(part.text, speechLang)
+          .then((t) => setTranslations((prev) => ({ ...prev, [key]: t })))
+          .catch((err) => {
+            console.error("translate failed", err);
+            translatingRef.current.delete(key);
+          });
+      });
+    }
+  }, [messages, speechLang, status, translations]);
+
   // Focus the textarea on mount, after each send, and after streaming finishes.
   useEffect(() => {
     if (status === "ready" || status === undefined) {
@@ -167,12 +207,16 @@ const Index = () => {
 
   // Build readable text from the last assistant message (text + offers)
   const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
-  const buildSpeechText = (): string => {
+  const buildSpeechText = (lang: SpeechLang): string => {
     if (!lastAssistant) return "";
     const chunks: string[] = [];
-    for (const part of lastAssistant.parts) {
-      if (part.type === "text" && part.text) chunks.push(part.text);
-    }
+    lastAssistant.parts.forEach((part, idx) => {
+      if (part.type === "text" && part.text) {
+        const key = `${lastAssistant.id}::${idx}::${lang}`;
+        const translated = lang !== "de" ? translations[key] : undefined;
+        chunks.push(translated ?? part.text);
+      }
+    });
     return chunks.join("\n\n");
   };
 
@@ -186,7 +230,7 @@ const Index = () => {
       setIsSpeaking(false);
       return;
     }
-    const rawText = buildSpeechText().trim();
+    const rawText = buildSpeechText(speechLang).trim();
     if (!rawText) return;
     // Markdown-Symbole (*, #) nicht mitlesen
     let text = rawText
@@ -198,22 +242,14 @@ const Index = () => {
 
     const langOpt = LANG_OPTIONS.find((l) => l.value === speechLang) ?? LANG_OPTIONS[0];
 
-    // Übersetzen, falls Zielsprache nicht Deutsch ist
-    if (speechLang !== "de") {
+    // Falls Übersetzung noch nicht im Cache vorliegt (z. B. fehlgeschlagen), on-demand übersetzen
+    const needsTranslate = speechLang !== "de" && lastAssistant?.parts.some(
+      (p, idx) => p.type === "text" && p.text && translations[`${lastAssistant.id}::${idx}::${speechLang}`] === undefined,
+    );
+    if (needsTranslate) {
       try {
         setIsPreparingSpeech(true);
-        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/translate`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ text, targetLang: speechLang }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Übersetzung fehlgeschlagen");
-        if (data?.text) text = String(data.text).trim();
+        text = await translateText(text, speechLang);
       } catch (err) {
         console.error("translate failed", err);
         toast({
@@ -286,9 +322,11 @@ const Index = () => {
     writeLines("Sozialraum-Assistent – Ergebnisse", { size: 16, bold: true, gap: 6 });
     writeLines(new Date().toLocaleString("de-DE"), { size: 9, gap: 12 });
 
-    for (const part of lastAssistant.parts) {
+    lastAssistant.parts.forEach((part, idx) => {
       if (part.type === "text" && part.text) {
-        writeLines(part.text, { size: 11, gap: 10 });
+        const key = `${lastAssistant.id}::${idx}::${speechLang}`;
+        const text = speechLang !== "de" ? translations[key] ?? part.text : part.text;
+        writeLines(text, { size: 11, gap: 10 });
       }
       if (part.type?.startsWith("tool-")) {
         const tp = part as ToolUIPart;
@@ -315,7 +353,7 @@ const Index = () => {
           });
         }
       }
-    }
+    });
 
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
     doc.save(`sozialraum-ergebnisse-${stamp}.pdf`);
@@ -365,8 +403,15 @@ const Index = () => {
                     })
                     .map((part, idx) => {
                     if (part.type === "text") {
-                      return message.role === "assistant" ? (
-                        <MessageResponse key={idx}>{part.text}</MessageResponse>
+                      const origIdx = message.parts.indexOf(part);
+                      const key = `${message.id}::${origIdx}::${speechLang}`;
+                      const isAssistant = message.role === "assistant";
+                      const displayText =
+                        isAssistant && speechLang !== "de"
+                          ? translations[key] ?? part.text
+                          : part.text;
+                      return isAssistant ? (
+                        <MessageResponse key={idx}>{displayText}</MessageResponse>
                       ) : (
                         <span key={idx}>{part.text}</span>
                       );
